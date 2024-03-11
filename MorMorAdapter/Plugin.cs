@@ -53,7 +53,7 @@ public class Plugin : TerrariaPlugin
         Deaths = new();
         Utils.MapingCommand();
         Utils.MapingRest();
-        SocketClient.OnConnect += () => SocketClient.SendMessgae(new BaseMessage() { MessageType = MessageType.Connect }.ToJson());
+        SocketClient.OnConnect += SkocketConnect;
         SocketClient.OnMessage += SocketClient_OnMessage;
         ServerApi.Hooks.GamePostInitialize.Register(this, OnInit);
         ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreet);
@@ -74,6 +74,11 @@ public class Plugin : TerrariaPlugin
                 MessageType = MessageType.HeartBeat
             }.ToJson());
         };
+    }
+
+    private void SkocketConnect()
+    {
+        SocketClient.SendMessgae(new BaseMessage() { MessageType = MessageType.Connect }.ToJson());
     }
 
     private void SocketClient_OnMessage(string e)

@@ -59,9 +59,9 @@ internal class SocketClient
     {
         if (ar.AsyncState is Socket clint && clint.Connected)
         {
+            await Task.Delay(100);
             OnConnect?.Invoke();
             TShock.Log.ConsoleError("成功连接到MorMorBOT...");
-            await Task.Delay(Plugin.Config.SocketConfig.ReConnectTimer);
             State state = new(clint);
             Client.BeginReceive(state.Buffer, 0, state.Buffer.Length, SocketFlags.None, ReceiveCallBack, state);
             clint.EndConnect(ar);
