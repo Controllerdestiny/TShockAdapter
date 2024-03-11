@@ -17,4 +17,6 @@ internal class Permission
     public const string OnlineRank = "tshock.online.rank";
 
     public const string DeathRank = "tshock.death.rank";
+
+    public const string SetProgress = "tshock.set.progress";
 }
