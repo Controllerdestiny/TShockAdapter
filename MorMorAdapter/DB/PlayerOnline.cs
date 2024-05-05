@@ -1,19 +1,20 @@
 ﻿using MySql.Data.MySqlClient;
 using System.Data;
-using TShockAPI;
 using TShockAPI.DB;
+using TShockAPI;
 
 namespace MorMorAdapter.DB;
 
 public class PlayerOnline : Dictionary<string, int>
 {
+    private HashSet<string> _players = new();
     public new int this[string key]
-    {
-        get
-        {
-            if (TryGetValue(key, out int result))
+    { 
+        get 
+        { 
+            if(TryGetValue(key, out int result))
                 return result;
-            return 0;
+            return 0; 
         }
 
         set
@@ -25,7 +26,7 @@ public class PlayerOnline : Dictionary<string, int>
     public PlayerOnline()
     {
         database = TShock.DB;
-        var Skeleton = new SqlTable("OnlineDuration",
+        var Skeleton = new SqlTable("BotOnlineDuration",
             new SqlColumn("username", MySqlDbType.Text) { Length = 500 },
             new SqlColumn("duration", MySqlDbType.Int32) { Length = 255 }
               );
@@ -36,18 +37,19 @@ public class PlayerOnline : Dictionary<string, int>
 
     public void ReadAll()
     {
-        using var reader = database.QueryReader("SELECT * FROM OnlineDuration");
+        using var reader = database.QueryReader("SELECT * FROM BotOnlineDuration");
         while (reader.Read())
         {
             string username = reader.Get<string>("username");
             int duration = reader.Get<int>("duration");
             this[username] = duration;
+            _players.Add(username);
         }
     }
 
     public bool Read(string name, out int duration)
     {
-        using var reader = database.QueryReader("SELECT * FROM `OnlineDuration` WHERE `username` LIKE @0", name);
+        using var reader = database.QueryReader("SELECT * FROM `BotOnlineDuration` WHERE `username` LIKE @0", name);
         if (reader.Read())
         {
             duration = reader.Get<int>("duration");
@@ -62,12 +64,13 @@ public class PlayerOnline : Dictionary<string, int>
 
     public bool Update(string Name, int duration)
     {
-        return 1 == database.Query("UPDATE `OnlineDuration` SET `duration` = @0 WHERE `OnlineDuration`.`username` = @1", duration, Name);
-
+        return 1 == database.Query("UPDATE `BotOnlineDuration` SET `duration` = @0 WHERE `BotOnlineDuration`.`username` = @1", duration, Name);
+        
     }
     public bool Insert(string Name, int duration)
     {
-        return 1 == database.Query("INSERT INTO `OnlineDuration` (`username`, `duration`) VALUES (@0, @1)", Name, duration);
+        _players.Add(Name);
+        return 1 == database.Query("INSERT INTO `BotOnlineDuration` (`username`, `duration`) VALUES (@0, @1)", Name, duration);
     }
 
 
@@ -75,7 +78,9 @@ public class PlayerOnline : Dictionary<string, int>
 
     public void AddOrUpdate(string name, int duration)
     {
-        if (!Update(name, duration))
+        if (_players.Contains(name))
+            Update(name, duration);
+        else
             Insert(name, duration);
     }
 

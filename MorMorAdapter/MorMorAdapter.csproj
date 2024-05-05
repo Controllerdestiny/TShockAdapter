@@ -7,7 +7,22 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="SixLabors.ImageSharp.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="SixLabors.ImageSharp.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="TShock" Version="5.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="SixLabors.ImageSharp">
+      <HintPath>SixLabors.ImageSharp.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

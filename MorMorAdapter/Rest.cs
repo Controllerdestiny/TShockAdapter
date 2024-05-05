@@ -157,4 +157,20 @@ internal class Rest
         }
     }
     #endregion
+
+    #region 获取图片Base64
+    [RestMatch("/generatemap")]
+    public object GenerateMapApi(RestRequestArgs args)
+    {
+        try
+        {
+            var bytes = Utils.CreateMapBytes();
+            return new RestObject("200") { Response = Convert.ToBase64String(bytes) };
+        }
+        catch (Exception ex)
+        {
+            return new RestObject("404") { Response = ex.Message };
+        }
+    }
+    #endregion
 }

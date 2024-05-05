@@ -5,6 +5,7 @@ using MorMorAdapter.Setting;
 using MorMorAdapter.SocketReceive;
 using Newtonsoft.Json.Linq;
 using System.Net;
+using System.Reflection;
 using System.Threading.Channels;
 using System.Timers;
 using Terraria;
@@ -36,12 +37,13 @@ public class Plugin : TerrariaPlugin
 
     private long TimerCount = 0;
 
-    private System.Timers.Timer Timer = new System.Timers.Timer();
+    private readonly System.Timers.Timer Timer = new();
 
     internal static Channel<int> Channeler = Channel.CreateBounded<int>(1);
 
     public Plugin(Main game) : base(game)
     {
+        AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
     }
 
     public override void Initialize()
@@ -74,6 +76,18 @@ public class Plugin : TerrariaPlugin
                 MessageType = MessageType.HeartBeat
             }.ToJson());
         };
+        
+    }
+
+    private Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
+    {
+        string resourceName = $"{Assembly.GetExecutingAssembly().GetName().Name}.{new AssemblyName(args.Name).Name}.dll";
+        using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
+        {
+            byte[] assemblyData = new byte[stream.Length];
+            stream.Read(assemblyData, 0, assemblyData.Length);
+            return Assembly.Load(assemblyData);
+        }
     }
 
     private void SkocketConnect()

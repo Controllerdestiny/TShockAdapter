@@ -4,11 +4,15 @@ using MorMorAdapter.Extension;
 using MorMorAdapter.Model;
 using Newtonsoft.Json;
 using Rests;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 using System.Reflection;
 using System.Text.Json.Nodes;
 using Terraria;
 using Terraria.GameContent.Creative;
 using Terraria.IO;
+using Terraria.Map;
 using TerrariaApi.Server;
 using TShockAPI;
 using TShockAPI.DB;
@@ -263,6 +267,34 @@ internal class Utils
             prefix = netItem.PrefixId
         };
         return item;
+    }
+    public static byte[] CreateMapBytes()
+    {
+        var image = CreateMapImage();
+        using var stream = new MemoryStream();
+        image.Save(stream, new PngEncoder());
+        return stream.ToArray();
+    }
+    public static Image CreateMapImage()
+    {
+        Image<Rgba32> image = new(Main.maxTilesX, Main.maxTilesY);
+
+        MapHelper.Initialize();
+        if (Main.Map == null)
+        {
+            Main.Map = new WorldMap(0, 0);
+        }
+        for (var x = 0; x < Main.maxTilesX; x++)
+        {
+            for (var y = 0; y < Main.maxTilesY; y++)
+            {
+                var tile = MapHelper.CreateMapTile(x, y, byte.MaxValue);
+                var col = MapHelper.GetMapTileXnaColor(ref tile);
+                image[x, y] = new Rgba32(col.R, col.G, col.B, col.A);
+            }
+        }
+
+        return image;
     }
 
     public static void RestServer()
