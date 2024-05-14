@@ -1,16 +1,23 @@
 ﻿using MorMorAdapter.DB;
 using MorMorAdapter.Enumerates;
-using MorMorAdapter.Model.SocketMsg;
+using MorMorAdapter.Model;
+using MorMorAdapter.Model.Action;
+using MorMorAdapter.Model.Action.Receive;
+using MorMorAdapter.Model.Action.Response;
+using MorMorAdapter.Model.Internet;
+using MorMorAdapter.Model.PlayerMessage;
+using MorMorAdapter.Model.ServerMessage;
+using MorMorAdapter.Net;
 using MorMorAdapter.Setting;
-using MorMorAdapter.SocketReceive;
-using Newtonsoft.Json.Linq;
-using System.Net;
+using ProtoBuf;
 using System.Reflection;
 using System.Threading.Channels;
 using System.Timers;
 using Terraria;
+using Terraria.IO;
 using TerrariaApi.Server;
 using TShockAPI;
+using TShockAPI.DB;
 
 namespace MorMorAdapter;
 
@@ -26,8 +33,6 @@ public class Plugin : TerrariaPlugin
     public override Version Version => new(1, 0, 0, 0);
 
     internal static readonly List<TSPlayer> ServerPlayers = new();
-
-    private static SocketClient SocketClient;
 
     internal static Config Config { get; set; }
 
@@ -49,14 +54,14 @@ public class Plugin : TerrariaPlugin
     public override void Initialize()
     {
         Config = new Config().Read();
-        SocketClient = new(IPAddress.Parse(Config.SocketConfig.IP), Config.SocketConfig.Port);
-        SocketClient.Start();
+        
         Onlines = new();
         Deaths = new();
         Utils.MapingCommand();
         Utils.MapingRest();
-        SocketClient.OnConnect += SkocketConnect;
-        SocketClient.OnMessage += SocketClient_OnMessage;
+        WebSocketReceive.OnConnect += SkocketConnect;
+        WebSocketReceive.OnMessage += SocketClient_OnMessage;
+        WebSocketReceive.Start(Config.SocketConfig.IP, Config.SocketConfig.Port);
         ServerApi.Hooks.GamePostInitialize.Register(this, OnInit);
         ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreet);
         ServerApi.Hooks.ServerLeave.Register(this, OnLeave);
@@ -71,10 +76,11 @@ public class Plugin : TerrariaPlugin
         Timer.Interval = Config.SocketConfig.HeartBeatTimer;
         Timer.Elapsed += (_, _) =>
         {
-            SocketClient.SendMessgae(new BaseMessage()
+            var obj = new BaseMessage()
             {
-                MessageType = MessageType.HeartBeat
-            }.ToJson());
+                MessageType = PostMessageType.HeartBeat
+            };
+            WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         };
         
     }
@@ -84,6 +90,8 @@ public class Plugin : TerrariaPlugin
         string resourceName = $"{Assembly.GetExecutingAssembly().GetName().Name}.{new AssemblyName(args.Name).Name}.dll";
         using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
         {
+            if (stream == null)
+                throw new NullReferenceException("无法加载程序集:" + args.Name);
             byte[] assemblyData = new byte[stream.Length];
             stream.Read(assemblyData, 0, assemblyData.Length);
             return Assembly.Load(assemblyData);
@@ -92,33 +100,208 @@ public class Plugin : TerrariaPlugin
 
     private void SkocketConnect()
     {
-        SocketClient.SendMessgae(new BaseMessage() { MessageType = MessageType.Connect }.ToJson());
+        var obj = new BaseMessage() { MessageType = PostMessageType.Connect };
+        WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
+        Console.WriteLine("成功连接到MorMor机器人....");
     }
 
-    private void SocketClient_OnMessage(string e)
+    private void SocketClient_OnMessage(byte[] buffer)
     {
         try
         {
-            var obj = JObject.Parse(e).ToObject<AcceptMessage>();
-            if (obj != null)
+            using MemoryStream ms = new(buffer);
+            var baseMsg = Serializer.Deserialize<BaseAction>(ms);
+            if (baseMsg != null && baseMsg.Token == Config.Token)
             {
-                switch (obj.Type)
+                switch (baseMsg.MessageType)
                 {
-                    case MessageType.PluginMsg:
-                        TShock.Utils.Broadcast(obj.Message, obj.Color[0], obj.Color[1], obj.Color[2]);
+                    case PostMessageType.Action:
+                        ActionAdapter(baseMsg, ms);
                         break;
-                    case MessageType.PrivateMsg:
-                        TShock.Players.FirstOrDefault(x => x != null && x.Name == obj.Name && x.Active)
-                            ?.SendInfoMessage(obj.Message, obj.Color[0], obj.Color[1], obj.Color[2]);
-                        break;
+                       
                 }
             }
         }
-        catch
+        catch(Exception ex)
         {
-            TShock.Log.ConsoleError($"[SocketClient] 接受到无法解析的字符串:{e}");
+            TShock.Log.ConsoleError($"[SocketClient] 接受到无法解析的字符串 {ex}");
         }
+    }
 
+    private void ActionAdapter(BaseAction baseMsg, MemoryStream stream)
+    {
+        stream.Position = 0;
+        switch(baseMsg.ActionType)
+        {
+            case ActionType.PluginMsg:
+                {
+                    var data = Serializer.Deserialize<BroadcastArgs>(stream);
+                    TShock.Utils.Broadcast(data.Text, data.Color[0], data.Color[1], data.Color[2]);
+                    var res = new BaseActionResponse()
+                    {
+                        Status = true,
+                        Message = "发送成功",
+                        Echo = data.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.PrivateMsg:
+                {
+                    var data = Serializer.Deserialize<PrivatMsgArgs>(stream);
+                    TShock.Players.FirstOrDefault(x => x != null && x.Name == data.Name && x.Active)
+                        ?.SendMessage(data.Text, data.Color[0], data.Color[1], data.Color[2]);
+                    var res = new BaseActionResponse()
+                    {
+                        Status = true,
+                        Message = "发送成功",
+                        Echo = data.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.Command:
+                {
+                    var data = Serializer.Deserialize<ServerCommandArgs>(stream);
+                    var player = new OneBotPlayer("MorMorBot");
+                    Commands.HandleCommand(player, data.Text);
+                    var res = new ServerCommand(player.CommandOutput)
+                    {
+                        Status = true,
+                        Message = "执行成功",
+                        Echo = data.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.WorldMap:
+                {
+                    var data = Serializer.Deserialize<MapImageArgs>(stream);
+                    var buffer = Utils.CreateMapBytes(data.ImageType);
+                    var res = new MapImage(buffer)
+                    {
+                        Status = true,
+                        Message = "地图生成成功",
+                        Echo = data.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.GameProgress:
+                {
+                    var res = new GameProgress(Utils.GetGameProgress())
+                    {
+                        Status = true,
+                        Message = "进度查询成功",
+                        Echo = baseMsg.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.OnlineRank:
+                {
+                    var res = new PlayerOnlineRank(Onlines)
+                    {
+                        Status = true,
+                        Message = "在线排行查询成功",
+                        Echo = baseMsg.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+
+            case ActionType.DeadRank:
+                {
+                    var res = new DeadRank(Deaths)
+                    {
+                        Status = true,
+                        Message = "死亡排行查询成功",
+                        Echo = baseMsg.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.Inventory:
+                {
+                    var data = Serializer.Deserialize<QueryPlayerInventoryArgs>(stream);
+                    var inventory = Utils.BInvSee(data.Name);
+                    var res = new PlayerInventory(inventory)
+                    {
+                        Status = inventory != null,
+                        Message = "",
+                        Echo = data.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.ServerOnline:
+                {
+                    var players = TShock.Players.Where(x => x != null && x.Active).Select(x => new PlayerInfo(x)).ToList();
+                    var res = new ServerOnline(players)
+                    {
+                        Status = true,
+                        Message = "查询成功",
+                        Echo = baseMsg.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.RegisterAccount:
+                {
+                    var res = new BaseActionResponse()
+                    {
+                        Echo = baseMsg.Echo
+                    };
+                    var data = Serializer.Deserialize<RegisterAccountArgs>(stream);
+                    try
+                    {
+                        var account = new UserAccount()
+                        {
+                            Name = data.Name,
+                            Group = data.Group
+                        };
+                        account.CreateBCryptHash(data.Password);
+                        TShock.UserAccounts.AddUserAccount(account);
+                        res.Status = true;
+                        res.Message = "注册成功";
+                    }
+                    catch (Exception ex)
+                    {
+                        res.Status = false;
+                        res.Message = ex.Message;
+                    }
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.UpLoadWorld:
+                {
+                    WorldFile.SaveWorld();
+                    var buffer = File.ReadAllBytes(Main.worldPathName);
+                    var res = new UpLoadWorldFile()
+                    {
+                        Status = true,
+                        Message = "成功",
+                        Echo = baseMsg.Echo,
+                        WorldBuffer = buffer,
+                        WorldName = Main.worldName
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    break;
+                }
+            case ActionType.RestServer:
+                {
+                    var data = Serializer.Deserialize<RestServerArgs>(stream);
+                    var res = new BaseActionResponse()
+                    {
+                        Status = true,
+                        Message = "正在重置",
+                        Echo = data.Echo
+                    };
+                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+                    Utils.RestServer(data);
+                    break;
+                }
+        }
     }
 
     private void OnKill(object? sender, GetDataHandlers.KillMeEventArgs e)
@@ -146,7 +329,8 @@ public class Plugin : TerrariaPlugin
             Main.GameMode = mode;
             TSPlayer.All.SendData(PacketTypes.WorldInfo);
         }
-        SocketClient.SendMessgae(new GameInitMessage().ToJson());
+        var obj = new GameInitMessage();
+        WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
     }
 
     private void OnChat(ServerChatEventArgs args)
@@ -157,11 +341,32 @@ public class Plugin : TerrariaPlugin
             if (args.Text.StartsWith(TShock.Config.Settings.CommandSilentSpecifier)
                 || args.Text.StartsWith(TShock.Config.Settings.CommandSpecifier))
             {
-                SocketClient.SendMessgae(new PlayerCommandMessage(player, args.Text).ToJson());
+                var prefix = args.Text.StartsWith(TShock.Config.Settings.CommandSilentSpecifier) ? TShock.Config.Settings.CommandSilentSpecifier : TShock.Config.Settings.CommandSpecifier;
+                var obj = new PlayerCommandMessage()
+                {
+                    MessageType = PostMessageType.PlayerCommand,
+                    Name = player.Name,
+                    Group = player.Group.Name,
+                    Prefix = player.Group.Prefix,
+                    IsLogin = player.IsLoggedIn,
+                    Command = args.Text,
+                    CommandPrefix = prefix,
+                };
+                WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
             }
             else
             {
-                SocketClient.SendMessgae(new PlayerChatMessage(player, args.Text).ToJson());
+                var obj = new PlayerChatMessage()
+                {
+                    MessageType = PostMessageType.PlayerMessage,
+                    Name = player.Name,
+                    Group = player.Group.Name,
+                    Prefix = player.Group.Prefix,
+                    IsLogin = player.IsLoggedIn,
+                    Text = args.Text
+                };
+                var stream = Utils.SerializeObj(obj);
+                WebSocketReceive.SendMessage(stream);
             }
         }
     }
@@ -175,7 +380,15 @@ public class Plugin : TerrariaPlugin
             {
                 player.Disconnect(Config.DisConnentFormat);
             }
-            SocketClient.SendMessgae(new PlayerJoinMessage(player).ToJson());
+            var obj = new PlayerJoinMessage()
+            {
+                MessageType = PostMessageType.PlayerJoin,
+                Name = player.Name,
+                Group = player.Group.Name,
+                Prefix = player.Group.Prefix,
+                IsLogin = player.IsLoggedIn,
+            };
+            WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         }
     }
 
@@ -185,7 +398,15 @@ public class Plugin : TerrariaPlugin
         if (player != null)
         {
             ServerPlayers.Remove(player);
-            SocketClient.SendMessgae(new PlayerLeaveMessage(player).ToJson());
+            var obj = new PlayerLeaveMessage()
+            {
+                MessageType = PostMessageType.PlayerLeave,
+                Name = player.Name,
+                Group = player.Group.Name,
+                Prefix = player.Group.Prefix,
+                IsLogin = player.IsLoggedIn,
+            };
+            WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         }
         Onlines.UpdateAll();
     }

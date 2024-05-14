@@ -12,6 +12,9 @@ public class Config
     [JsonProperty("阻止语句")]
     public string DisConnentFormat { get; set; } = "未注禁止进入服务器！";
 
+    [JsonProperty("验证令牌")]
+    public string Token { get; set; } = string.Empty;
+
     [JsonProperty("Socket")]
     public SocketConfig SocketConfig { get; set; } = new();
 

@@ -1,14 +1,17 @@
 ﻿using MorMorAdapter.Attributes;
 using MorMorAdapter.Enumerates;
 using MorMorAdapter.Extension;
-using MorMorAdapter.Model;
-using Newtonsoft.Json;
+using MorMorAdapter.Model.Action.Receive;
+using MorMorAdapter.Model.Internet;
+using ProtoBuf;
+using ProtoBuf.Meta;
 using Rests;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
+using System.Diagnostics;
 using System.Reflection;
-using System.Text.Json.Nodes;
 using Terraria;
 using Terraria.GameContent.Creative;
 using Terraria.IO;
@@ -21,6 +24,22 @@ namespace MorMorAdapter;
 
 internal class Utils
 {
+   
+
+    public static T ReadProtobufItem<T>(MemoryStream stream)
+    {
+        stream.Seek(0, SeekOrigin.Begin);
+        var mode = RuntimeTypeModel.Create();
+        mode.Add(typeof(T), true);
+        return mode.Deserialize<T>(stream);
+    }
+
+    public static MemoryStream SerializeObj<T>(T obj)
+    {
+        MemoryStream stream = new();
+        Serializer.Serialize(stream, obj);
+        return stream;
+    }
     public static bool SetGameProgress(string type, bool enable)
     {
         var fields = typeof(ProgressType).GetFields().Where(x => x.FieldType == typeof(ProgressType));
@@ -168,14 +187,97 @@ internal class Utils
     /// <param name="items">物品数组</param>
     /// <param name="slots">背包格</param>
     /// <returns></returns>
-    public static Model.Item[] GetInventoryData(Terraria.Item[] items, int slots)
+    public static Model.Internet.Item[] GetInventoryData(Terraria.Item[] items, int slots)
     {
-        Model.Item[] info = new Model.Item[slots];
+        Model.Internet.Item[] info = new Model.Internet.Item[slots];
         for (int i = 0; i < slots; i++)
         {
-            info[i] = new Model.Item(items[i].netID, items[i].prefix, items[i].stack);
+            info[i] = new Model.Internet.Item(items[i].netID, items[i].prefix, items[i].stack);
         }
         return info;
+    }
+
+
+    public static Model.Internet.PlayerData? BInvSee(string playerName)
+    {
+        var tsplayer = new Player();
+        var players = TSPlayer.FindByNameOrID(playerName);
+        if (players.Count != 0)
+        {
+            tsplayer = players[0].TPlayer;
+        }
+        else
+        {
+            var offline = TShock.UserAccounts.GetUserAccountByName(playerName);
+            if (offline == null)
+            {
+                return null;
+            }
+            playerName = offline.Name;
+            var data = TShock.CharacterDB.GetPlayerData(new TSPlayer(-1), offline.ID);
+            tsplayer = Utils.ModifyData(playerName, data);
+        }
+        var retObject = new Model.Internet.PlayerData
+        {
+            //在线状态
+            OnlineStatu = false,
+            //玩家名称
+            Username = playerName,
+            //最大生命
+            statLifeMax = tsplayer.statLifeMax,
+            //当前生命
+            statLife = tsplayer.statLife,
+            //最大法力
+            statManaMax = tsplayer.statManaMax,
+            //当前法力
+            statMana = tsplayer.statMana,
+            //buff
+            buffType = tsplayer.buffType,
+            //buff 时间
+            buffTime = tsplayer.buffTime,
+            //背包
+            inventory = Utils.GetInventoryData(tsplayer.inventory, NetItem.InventorySlots),
+            //宠物坐骑的染料
+            miscDye = Utils.GetInventoryData(tsplayer.miscDyes, NetItem.MiscDyeSlots),
+            //宠物坐骑等
+            miscEquip = Utils.GetInventoryData(tsplayer.miscEquips, NetItem.MiscEquipSlots),
+            //套装
+            Loadout = new Suits[tsplayer.Loadouts.Length]
+        };
+        for (int i = 0; i < tsplayer.Loadouts.Length; i++)
+        {
+            if (i == tsplayer.CurrentLoadoutIndex)
+            {
+                retObject.Loadout[i] = new Suits()
+                {
+                    armor = Utils.GetInventoryData(tsplayer.armor, NetItem.ArmorSlots),
+                    dye = Utils.GetInventoryData(tsplayer.dye, NetItem.DyeSlots),
+                };
+            }
+            else
+            {
+                retObject.Loadout[i] = new Suits()
+                {
+                    armor = Utils.GetInventoryData(tsplayer.Loadouts[i].Armor, tsplayer.Loadouts[i].Armor.Length),
+                    dye = Utils.GetInventoryData(tsplayer.Loadouts[i].Dye, tsplayer.Loadouts[i].Dye.Length)
+                };
+            }
+        }
+        //垃圾桶
+        retObject.trashItem = new Model.Internet.Item[1]
+        {
+            new(tsplayer.trashItem.netID, tsplayer.trashItem.prefix, tsplayer.trashItem.stack)
+        };
+        //猪猪存钱罐
+        retObject.Piggiy = GetInventoryData(tsplayer.bank.item, NetItem.PiggySlots);
+        //保险箱
+        retObject.safe = GetInventoryData(tsplayer.bank2.item, NetItem.SafeSlots);
+        //护卫熔炉
+        retObject.Forge = GetInventoryData(tsplayer.bank3.item, NetItem.ForgeSlots);
+        //虚空保险箱
+        retObject.VoidVault = GetInventoryData(tsplayer.bank4.item, NetItem.VoidSlots);
+
+        return retObject;
     }
 
     /// <summary>
@@ -268,14 +370,14 @@ internal class Utils
         };
         return item;
     }
-    public static byte[] CreateMapBytes()
+    public static byte[] CreateMapBytes(ImageType type)
     {
         var image = CreateMapImage();
         using var stream = new MemoryStream();
-        image.Save(stream, new PngEncoder());
+        image.Save(stream, type == ImageType.Png ? new PngEncoder() : new JpegEncoder());
         return stream.ToArray();
     }
-    public static Image CreateMapImage()
+    public static SixLabors.ImageSharp.Image CreateMapImage()
     {
         Image<Rgba32> image = new(Main.maxTilesX, Main.maxTilesY);
 
@@ -297,10 +399,14 @@ internal class Utils
         return image;
     }
 
-    public static void RestServer()
+    public static void RestServer(RestServerArgs args)
     {
         WorldFile.SaveWorld();
         ClearDB();
+        foreach (var cmd in Plugin.Config.ResetConfig.Commands)
+        {
+            Commands.HandleCommand(TSPlayer.Server, cmd);
+        }
         //关闭rest
         TShock.RestApi.Stop();
         //关闭Tshock日志
@@ -314,11 +420,19 @@ internal class Utils
             new DirectoryInfo(TShock.Config.Settings.LogPath)
                 .GetFiles()
                 .ForEach(x => x.Delete());
-
+        
         if (Plugin.Config.ResetConfig.ClearMap && File.Exists(Main.worldPathName))
             File.Delete(Main.worldPathName);
+        var dir = Path.GetDirectoryName(Main.worldPathName);
+        if (args.UseFile)
+        { 
+            File.WriteAllBytes(Path.Combine(dir, args.FileName), args.FileBuffer);
+        }
         Netplay.SaveOnServerExit = false;
         Netplay.Disconnect = true;
+        var currentProcess = Process.GetCurrentProcess();
+        Process.Start(currentProcess.MainModule!.FileName!, args.StartArgs);
+        Environment.Exit(0);
     }
 
     public static void ClearDB()

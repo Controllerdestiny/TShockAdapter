@@ -1,9 +1,10 @@
-﻿using MorMorAdapter.Model;
-using MorMorAdapter.Attributes;
+﻿using MorMorAdapter.Attributes;
 using Rests;
 using Terraria;
 using TShockAPI;
-using Item = MorMorAdapter.Model.Item;
+using Item = MorMorAdapter.Model.Internet.Item;
+using MorMorAdapter.Model.Internet;
+using MorMorAdapter.Enumerates;
 
 namespace MorMorAdapter;
 
@@ -45,7 +46,7 @@ internal class Rest
             var data = TShock.CharacterDB.GetPlayerData(new TSPlayer(-1), offline.ID);
             tsplayer = Utils.ModifyData(playerName, data);
         }
-        var retObject = new Model.PlayerData
+        var retObject = new Model.Internet.PlayerData
         {
             //在线状态
             OnlineStatu = false,
@@ -142,21 +143,21 @@ internal class Rest
     }
     #endregion
 
-    #region 重置
-    [RestMatch("/reset")]
-    public object Reset(RestRequestArgs args)
-    {
-        try
-        {
-            Utils.RestServer();
-            return new RestObject("200") { Response = "执行成功!" };
-        }
-        catch (Exception ex)
-        {
-            return new RestObject("404") { Response = ex.Message };
-        }
-    }
-    #endregion
+    //#region 重置
+    //[RestMatch("/reset")]
+    //public object Reset(RestRequestArgs args)
+    //{
+    //    try
+    //    {
+    //        Utils.RestServer();
+    //        return new RestObject("200") { Response = "执行成功!" };
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        return new RestObject("404") { Response = ex.Message };
+    //    }
+    //}
+    //#endregion
 
     #region 获取图片Base64
     [RestMatch("/generatemap")]
@@ -164,7 +165,7 @@ internal class Rest
     {
         try
         {
-            var bytes = Utils.CreateMapBytes();
+            var bytes = Utils.CreateMapBytes(ImageType.Png);
             return new RestObject("200") { Response = Convert.ToBase64String(bytes) };
         }
         catch (Exception ex)
