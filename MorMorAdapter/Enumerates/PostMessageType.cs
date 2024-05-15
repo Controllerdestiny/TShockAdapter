@@ -8,14 +8,7 @@ public enum PostMessageType
     /// 执行方法
     /// </summary>
     Action,
-    /// <summary>
-    /// 服务器地图图片
-    /// </summary>
-    WorldMap,
-    /// <summary>
-    /// 服务器地图文件
-    /// </summary>
-    WorldFile,
+
     /// <summary>
     /// 服务器初始化完成
     /// </summary>

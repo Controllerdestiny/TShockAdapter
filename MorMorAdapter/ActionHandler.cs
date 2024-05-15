@@ -42,6 +42,12 @@ public class ActionHandler
             Handler(action, stream);
     }
 
+    private static void ResponseAction<T>(T obj) where T : BaseAction
+    {
+        obj.MessageType = PostMessageType.Action;
+        WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
+    }
+
     private static void ServerStatusHandler(BaseAction action, MemoryStream stream)
     {
         var res = new ServerStatus()
@@ -63,7 +69,7 @@ public class ActionHandler
             WorldWidth = Main.maxTilesX,
             RunTime = (DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime)
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void ReStartServerHandler(BaseAction action, MemoryStream stream)
@@ -75,7 +81,7 @@ public class ActionHandler
             Message = "正在进行重启",
             Echo = action.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
         Utils.ReStarServer(data.StartArgs, true);
     }
 
@@ -90,7 +96,7 @@ public class ActionHandler
             Message = "执行成功",
             Echo = data.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void PrivateMsgHandler(BaseAction action, MemoryStream stream)
@@ -104,7 +110,7 @@ public class ActionHandler
             Message = "发送成功",
             Echo = data.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void PluginMsgHandler(BaseAction action, MemoryStream stream)
@@ -117,7 +123,7 @@ public class ActionHandler
             Message = "发送成功",
             Echo = data.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void RegisterAccountHandler(BaseAction action, MemoryStream stream)
@@ -144,7 +150,7 @@ public class ActionHandler
             res.Status = false;
             res.Message = ex.Message;
         }
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void ServerOnlineHandler(BaseAction action, MemoryStream stream)
@@ -156,7 +162,7 @@ public class ActionHandler
             Message = "查询成功",
             Echo = action.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void RestServerHandler(BaseAction action, MemoryStream stream)
@@ -168,7 +174,7 @@ public class ActionHandler
             Message = "正在重置",
             Echo = data.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
         Utils.RestServer(data);
     }
 
@@ -182,7 +188,7 @@ public class ActionHandler
             Message = "",
             Echo = data.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void UploadWorldHandler(BaseAction action, MemoryStream stream)
@@ -197,7 +203,7 @@ public class ActionHandler
             WorldBuffer = buffer,
             WorldName = Main.worldName
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void GameProgressHandler(BaseAction action, MemoryStream stream)
@@ -208,7 +214,7 @@ public class ActionHandler
             Message = "进度查询成功",
             Echo = action.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void WorldMapHandler(BaseAction action, MemoryStream stream)
@@ -221,7 +227,7 @@ public class ActionHandler
             Message = "地图生成成功",
             Echo = data.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void OnlineRankHandler(BaseAction action, MemoryStream stream)
@@ -232,7 +238,7 @@ public class ActionHandler
             Message = "在线排行查询成功",
             Echo = action.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 
     private static void DeadRankHandler(BaseAction action, MemoryStream stream)
@@ -243,6 +249,6 @@ public class ActionHandler
             Message = "死亡排行查询成功",
             Echo = action.Echo
         };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(res));
+        ResponseAction(res);
     }
 }
