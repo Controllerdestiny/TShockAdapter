@@ -10,6 +10,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
+using Steamworks;
 using System.Diagnostics;
 using System.Reflection;
 using Terraria;
@@ -399,6 +400,22 @@ internal class Utils
         return image;
     }
 
+    public static void ReStarServer(string startArgs, bool save = false)
+    {
+        if (save)
+        {
+            TShock.Utils.StopServer(true);
+        }
+        else
+        { 
+            Netplay.SaveOnServerExit = false;
+            Netplay.Disconnect = true;
+        }
+        var currentProcess = Process.GetCurrentProcess();
+        Process.Start(currentProcess.MainModule!.FileName!, startArgs);
+        Environment.Exit(0);
+    }
+
     public static void RestServer(RestServerArgs args)
     {
         WorldFile.SaveWorld();
@@ -428,11 +445,7 @@ internal class Utils
         { 
             File.WriteAllBytes(Path.Combine(dir, args.FileName), args.FileBuffer);
         }
-        Netplay.SaveOnServerExit = false;
-        Netplay.Disconnect = true;
-        var currentProcess = Process.GetCurrentProcess();
-        Process.Start(currentProcess.MainModule!.FileName!, args.StartArgs);
-        Environment.Exit(0);
+        ReStarServer(args.StartArgs);
     }
 
     public static void ClearDB()

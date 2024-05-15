@@ -2,9 +2,6 @@
 using MorMorAdapter.Enumerates;
 using MorMorAdapter.Model;
 using MorMorAdapter.Model.Action;
-using MorMorAdapter.Model.Action.Receive;
-using MorMorAdapter.Model.Action.Response;
-using MorMorAdapter.Model.Internet;
 using MorMorAdapter.Model.PlayerMessage;
 using MorMorAdapter.Model.ServerMessage;
 using MorMorAdapter.Net;
@@ -14,10 +11,8 @@ using System.Reflection;
 using System.Threading.Channels;
 using System.Timers;
 using Terraria;
-using Terraria.IO;
 using TerrariaApi.Server;
 using TShockAPI;
-using TShockAPI.DB;
 
 namespace MorMorAdapter;
 
@@ -69,7 +64,22 @@ public class Plugin : TerrariaPlugin
         ServerApi.Hooks.ServerChat.Register(this, OnChat);
         ServerApi.Hooks.GameUpdate.Register(this, OnUpdate);
         GetDataHandlers.KillMe.Register(OnKill);
-        TShockAPI.Hooks.GeneralHooks.ReloadEvent += e => Config = Config.Read();
+        Config.SocketConfig.EmptyCommand.ForEach(x =>
+        {
+            Commands.ChatCommands.Add(new("", (_) => { }, x));
+        });
+        TShockAPI.Hooks.GeneralHooks.ReloadEvent += e =>
+        {
+            Config.SocketConfig.EmptyCommand.ForEach(cmd =>
+            {
+                Commands.ChatCommands.RemoveAll(x => x.Names.Contains(cmd));
+            });
+            Config = Config.Read();
+            Config.SocketConfig.EmptyCommand.ForEach(x =>
+            {
+                Commands.ChatCommands.Add(new("", (_) => { }, x));
+            });
+        };
         Utils.HandleCommandLine(Environment.GetCommandLineArgs());
         Timer.AutoReset = true;
         Timer.Enabled = true;
@@ -116,191 +126,14 @@ public class Plugin : TerrariaPlugin
                 switch (baseMsg.MessageType)
                 {
                     case PostMessageType.Action:
-                        ActionAdapter(baseMsg, ms);
+                        ActionHandler.Adapter(baseMsg, ms);
                         break;
-                       
                 }
             }
         }
         catch(Exception ex)
         {
             TShock.Log.ConsoleError($"[SocketClient] 接受到无法解析的字符串 {ex}");
-        }
-    }
-
-    private void ActionAdapter(BaseAction baseMsg, MemoryStream stream)
-    {
-        stream.Position = 0;
-        switch(baseMsg.ActionType)
-        {
-            case ActionType.PluginMsg:
-                {
-                    var data = Serializer.Deserialize<BroadcastArgs>(stream);
-                    TShock.Utils.Broadcast(data.Text, data.Color[0], data.Color[1], data.Color[2]);
-                    var res = new BaseActionResponse()
-                    {
-                        Status = true,
-                        Message = "发送成功",
-                        Echo = data.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.PrivateMsg:
-                {
-                    var data = Serializer.Deserialize<PrivatMsgArgs>(stream);
-                    TShock.Players.FirstOrDefault(x => x != null && x.Name == data.Name && x.Active)
-                        ?.SendMessage(data.Text, data.Color[0], data.Color[1], data.Color[2]);
-                    var res = new BaseActionResponse()
-                    {
-                        Status = true,
-                        Message = "发送成功",
-                        Echo = data.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.Command:
-                {
-                    var data = Serializer.Deserialize<ServerCommandArgs>(stream);
-                    var player = new OneBotPlayer("MorMorBot");
-                    Commands.HandleCommand(player, data.Text);
-                    var res = new ServerCommand(player.CommandOutput)
-                    {
-                        Status = true,
-                        Message = "执行成功",
-                        Echo = data.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.WorldMap:
-                {
-                    var data = Serializer.Deserialize<MapImageArgs>(stream);
-                    var buffer = Utils.CreateMapBytes(data.ImageType);
-                    var res = new MapImage(buffer)
-                    {
-                        Status = true,
-                        Message = "地图生成成功",
-                        Echo = data.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.GameProgress:
-                {
-                    var res = new GameProgress(Utils.GetGameProgress())
-                    {
-                        Status = true,
-                        Message = "进度查询成功",
-                        Echo = baseMsg.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.OnlineRank:
-                {
-                    var res = new PlayerOnlineRank(Onlines)
-                    {
-                        Status = true,
-                        Message = "在线排行查询成功",
-                        Echo = baseMsg.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-
-            case ActionType.DeadRank:
-                {
-                    var res = new DeadRank(Deaths)
-                    {
-                        Status = true,
-                        Message = "死亡排行查询成功",
-                        Echo = baseMsg.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.Inventory:
-                {
-                    var data = Serializer.Deserialize<QueryPlayerInventoryArgs>(stream);
-                    var inventory = Utils.BInvSee(data.Name);
-                    var res = new PlayerInventory(inventory)
-                    {
-                        Status = inventory != null,
-                        Message = "",
-                        Echo = data.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.ServerOnline:
-                {
-                    var players = TShock.Players.Where(x => x != null && x.Active).Select(x => new PlayerInfo(x)).ToList();
-                    var res = new ServerOnline(players)
-                    {
-                        Status = true,
-                        Message = "查询成功",
-                        Echo = baseMsg.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.RegisterAccount:
-                {
-                    var res = new BaseActionResponse()
-                    {
-                        Echo = baseMsg.Echo
-                    };
-                    var data = Serializer.Deserialize<RegisterAccountArgs>(stream);
-                    try
-                    {
-                        var account = new UserAccount()
-                        {
-                            Name = data.Name,
-                            Group = data.Group
-                        };
-                        account.CreateBCryptHash(data.Password);
-                        TShock.UserAccounts.AddUserAccount(account);
-                        res.Status = true;
-                        res.Message = "注册成功";
-                    }
-                    catch (Exception ex)
-                    {
-                        res.Status = false;
-                        res.Message = ex.Message;
-                    }
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.UpLoadWorld:
-                {
-                    WorldFile.SaveWorld();
-                    var buffer = File.ReadAllBytes(Main.worldPathName);
-                    var res = new UpLoadWorldFile()
-                    {
-                        Status = true,
-                        Message = "成功",
-                        Echo = baseMsg.Echo,
-                        WorldBuffer = buffer,
-                        WorldName = Main.worldName
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    break;
-                }
-            case ActionType.RestServer:
-                {
-                    var data = Serializer.Deserialize<RestServerArgs>(stream);
-                    var res = new BaseActionResponse()
-                    {
-                        Status = true,
-                        Message = "正在重置",
-                        Echo = data.Echo
-                    };
-                    WebSocketReceive.SendMessage(Utils.SerializeObj(res));
-                    Utils.RestServer(data);
-                    break;
-                }
         }
     }
 
