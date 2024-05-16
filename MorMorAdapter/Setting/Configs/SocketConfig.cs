@@ -13,6 +13,9 @@ public class SocketConfig
     [JsonProperty("端口")]
     public int Port = 6000;
 
+    [JsonProperty("验证令牌")]
+    public string Token { get; set; } = string.Empty;
+
     [JsonProperty("心跳包间隔")]
     public int HeartBeatTimer = 1 * 60 * 1000;
 

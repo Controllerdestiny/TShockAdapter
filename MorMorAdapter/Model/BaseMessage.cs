@@ -16,5 +16,5 @@ public class BaseMessage
 
     [ProtoMember(2)] public string ServerName { get; set; } = Plugin.Config.SocketConfig.ServerName;
 
-    [ProtoMember(3)] public string Token { get; set; } = string.Empty;
+    [ProtoMember(3)] public string Token { get; set; } = Plugin.Config.SocketConfig.Token;
 }

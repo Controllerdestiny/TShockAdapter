@@ -49,7 +49,8 @@ public class Plugin : TerrariaPlugin
     public override void Initialize()
     {
         Config = new Config().Read();
-        
+        if (!Directory.Exists("world"))
+            Directory.CreateDirectory("world");
         Onlines = new();
         Deaths = new();
         Utils.MapingCommand();
@@ -92,7 +93,6 @@ public class Plugin : TerrariaPlugin
             };
             WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         };
-        
     }
 
     private Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
@@ -121,7 +121,7 @@ public class Plugin : TerrariaPlugin
         {
             using MemoryStream ms = new(buffer);
             var baseMsg = Serializer.Deserialize<BaseAction>(ms);
-            if (baseMsg != null && baseMsg.Token == Config.Token)
+            if (baseMsg != null && baseMsg.Token == Config.SocketConfig.Token)
             {
                 switch (baseMsg.MessageType)
                 {

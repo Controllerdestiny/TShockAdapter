@@ -67,6 +67,7 @@ public class ActionHandler
             }).ToList(),
             WorldHeight = Main.maxTilesY,
             WorldWidth = Main.maxTilesX,
+            TShockPath = Environment.CurrentDirectory,
             RunTime = (DateTime.Now - System.Diagnostics.Process.GetCurrentProcess().StartTime)
         };
         ResponseAction(res);
