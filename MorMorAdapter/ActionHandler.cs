@@ -2,14 +2,14 @@
 using MorMorAdapter.Model.Action;
 using MorMorAdapter.Model.Action.Receive;
 using MorMorAdapter.Model.Action.Response;
-using MorMorAdapter.Net;
-using Terraria;
-using ProtoBuf;
-using Terraria.IO;
 using MorMorAdapter.Model.Internet;
+using MorMorAdapter.Net;
+using ProtoBuf;
+using Terraria;
+using Terraria.IO;
+using TerrariaApi.Server;
 using TShockAPI;
 using TShockAPI.DB;
-using TerrariaApi.Server;
 
 namespace MorMorAdapter;
 
@@ -25,20 +25,58 @@ public class ActionHandler
         { ActionType.GameProgress , GameProgressHandler },
         { ActionType.UpLoadWorld , UploadWorldHandler },
         { ActionType.Inventory , InventoryHandler },
-        { ActionType.RestServer , RestServerHandler },
+        { ActionType.ResetServer , RestServerHandler },
         { ActionType.ServerOnline , ServerOnlineHandler },
         { ActionType.RegisterAccount , RegisterAccountHandler },
         { ActionType.PluginMsg , PluginMsgHandler },
         { ActionType.PrivateMsg , PrivateMsgHandler },
         { ActionType.Command , CommandHandler },
         { ActionType.ReStartServer , ReStartServerHandler },
-        { ActionType.ServerStatus , ServerStatusHandler }
+        { ActionType.ServerStatus , ServerStatusHandler },
+        { ActionType.ResetPassword , ResetPasswordHandler },
     };
 
+    private static void ResetPasswordHandler(BaseAction action, MemoryStream stream)
+    {
+        var data = Serializer.Deserialize<PlayerPasswordResetArgs>(stream);
+        var msg = "更改成功";
+        var status = true;
+        var account = new UserAccount()
+        {
+            Name = data.Name
+        };
+        try
+        {
+            TShock.UserAccounts.SetUserAccountPassword(account, data.Password);
+        }
+        catch (UserAccountNotExistException)
+        {
+            msg = "所更改的玩家账户不存在!";
+            status = false;
+        }
+        catch (UserAccountManagerException)
+        {
+            msg = $"尝试更改{data.Name} 的密码失败，原因不明,请查看服务器控制台了解详情。";
+            status = false;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            msg = $"密码必须不少于{TShock.Config.Settings.MinimumPasswordLength}个字符";
+            status = false;
+        }
+        var res = new BaseActionResponse()
+        {
+            Status = status,
+            Message = msg,
+            Echo = data.Echo
+        };
+        ResponseAction(res);
+    }
+
     public static void Adapter(BaseAction action, MemoryStream stream)
-    { 
+    {
         stream.Position = 0;
-        if(_action.TryGetValue(action.ActionType, out var Handler))
+        if (_action.TryGetValue(action.ActionType, out var Handler))
             Handler(action, stream);
     }
 
@@ -168,7 +206,7 @@ public class ActionHandler
 
     private static void RestServerHandler(BaseAction action, MemoryStream stream)
     {
-        var data = Serializer.Deserialize<RestServerArgs>(stream);
+        var data = Serializer.Deserialize<ResetServerArgs>(stream);
         var res = new BaseActionResponse()
         {
             Status = true,

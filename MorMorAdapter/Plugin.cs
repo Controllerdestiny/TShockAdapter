@@ -97,7 +97,7 @@ public class Plugin : TerrariaPlugin
 
     private Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
     {
-        string resourceName = $"{Assembly.GetExecutingAssembly().GetName().Name}.{new AssemblyName(args.Name).Name}.dll";
+        string resourceName = $"{Assembly.GetExecutingAssembly().GetName().Name}.lib.{new AssemblyName(args.Name).Name}.dll";
         using (var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName))
         {
             if (stream == null)
@@ -131,7 +131,7 @@ public class Plugin : TerrariaPlugin
                 }
             }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             TShock.Log.ConsoleError($"[SocketClient] 接受到无法解析的字符串 {ex}");
         }

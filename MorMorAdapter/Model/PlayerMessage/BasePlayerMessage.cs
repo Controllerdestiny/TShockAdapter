@@ -1,6 +1,4 @@
-﻿using Newtonsoft.Json;
-using ProtoBuf;
-using TShockAPI;
+﻿using ProtoBuf;
 
 namespace MorMorAdapter.Model.PlayerMessage;
 
@@ -13,10 +11,10 @@ public class BasePlayerMessage : BaseMessage
 {
     [ProtoMember(4)] public string Name { get; set; }
 
-    [ProtoMember(5)]  public string Group { get; set; }
+    [ProtoMember(5)] public string Group { get; set; }
 
-    [ProtoMember(6)]  public string Prefix { get; set; }
+    [ProtoMember(6)] public string Prefix { get; set; }
 
-    [ProtoMember(7)]  public bool IsLogin { get; set; }
+    [ProtoMember(7)] public bool IsLogin { get; set; }
 
 }

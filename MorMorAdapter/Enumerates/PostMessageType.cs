@@ -1,6 +1,4 @@
-﻿using System.ComponentModel;
-
-namespace MorMorAdapter.Enumerates;
+﻿namespace MorMorAdapter.Enumerates;
 
 public enum PostMessageType
 {

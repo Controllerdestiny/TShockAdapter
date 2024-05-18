@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace MorMorAdapter.Enumerates
+﻿namespace MorMorAdapter.Enumerates
 {
     internal enum Status
     {

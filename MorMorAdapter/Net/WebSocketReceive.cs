@@ -1,5 +1,4 @@
-﻿using IL.Terraria;
-using System.Net.WebSockets;
+﻿using System.Net.WebSockets;
 using TShockAPI;
 
 namespace MorMorAdapter.Net;
@@ -17,8 +16,8 @@ public class WebSocketReceive
         await SendMessage(stream.ToArray());
     }
     public static async Task SendMessage(byte[] message)
-    { 
-        if(ClientWebSocket.State == WebSocketState.Open)
+    {
+        if (ClientWebSocket.State == WebSocketState.Open)
         {
             try
             {
@@ -31,7 +30,7 @@ public class WebSocketReceive
         }
     }
 
-  
+
 
     public static async Task Start(string Host, int Port)
     {
@@ -70,8 +69,8 @@ public class WebSocketReceive
                 await Task.Delay(5000);
             }
         });
-      
+
     }
 
-   
+
 }

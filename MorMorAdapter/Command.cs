@@ -1,6 +1,4 @@
-﻿using Microsoft.Xna.Framework;
-using MorMorAdapter.Attributes;
-using Terraria;
+﻿using MorMorAdapter.Attributes;
 using TShockAPI;
 
 namespace MorMorAdapter;

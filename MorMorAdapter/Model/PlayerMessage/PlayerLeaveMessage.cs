@@ -1,11 +1,9 @@
-﻿using MorMorAdapter.Enumerates;
-using ProtoBuf;
-using TShockAPI;
+﻿using ProtoBuf;
 
 namespace MorMorAdapter.Model.PlayerMessage;
 
 [ProtoContract]
 internal class PlayerLeaveMessage : BasePlayerMessage
 {
- 
+
 }

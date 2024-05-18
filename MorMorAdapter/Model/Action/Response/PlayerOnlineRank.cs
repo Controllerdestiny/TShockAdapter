@@ -7,7 +7,7 @@ public class PlayerOnlineRank : BaseActionResponse
 {
     [ProtoMember(8)] public Dictionary<string, int> OnlineRank { get; set; }
 
-    public PlayerOnlineRank(Dictionary<string,int> rank) : base()
+    public PlayerOnlineRank(Dictionary<string, int> rank) : base()
     {
         OnlineRank = rank;
     }

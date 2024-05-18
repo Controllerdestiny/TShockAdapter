@@ -1,10 +1,10 @@
 ﻿using MorMorAdapter.Attributes;
+using MorMorAdapter.Enumerates;
+using MorMorAdapter.Model.Internet;
 using Rests;
 using Terraria;
 using TShockAPI;
 using Item = MorMorAdapter.Model.Internet.Item;
-using MorMorAdapter.Model.Internet;
-using MorMorAdapter.Enumerates;
 
 namespace MorMorAdapter;
 

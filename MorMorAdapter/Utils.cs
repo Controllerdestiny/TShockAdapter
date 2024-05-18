@@ -10,7 +10,6 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
-using Steamworks;
 using System.Diagnostics;
 using System.Reflection;
 using Terraria;
@@ -25,7 +24,7 @@ namespace MorMorAdapter;
 
 internal class Utils
 {
-   
+
 
     public static T ReadProtobufItem<T>(MemoryStream stream)
     {
@@ -407,7 +406,7 @@ internal class Utils
             TShock.Utils.StopServer(true);
         }
         else
-        { 
+        {
             Netplay.SaveOnServerExit = false;
             Netplay.Disconnect = true;
         }
@@ -416,7 +415,7 @@ internal class Utils
         Environment.Exit(0);
     }
 
-    public static void RestServer(RestServerArgs args)
+    public static void RestServer(ResetServerArgs args)
     {
         WorldFile.SaveWorld();
         ClearDB();
@@ -437,12 +436,12 @@ internal class Utils
             new DirectoryInfo(TShock.Config.Settings.LogPath)
                 .GetFiles()
                 .ForEach(x => x.Delete());
-        
+
         if (Plugin.Config.ResetConfig.ClearMap && File.Exists(Main.worldPathName))
             File.Delete(Main.worldPathName);
         var dir = Path.GetDirectoryName(Main.worldPathName);
         if (args.UseFile)
-        { 
+        {
             File.WriteAllBytes(Path.Combine(dir, args.FileName), args.FileBuffer);
         }
         ReStarServer(args.StartArgs);
