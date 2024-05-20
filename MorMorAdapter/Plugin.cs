@@ -221,6 +221,8 @@ public class Plugin : TerrariaPlugin
         var player = TShock.Players[args.Who];
         if (player != null)
         {
+            if (!ServerPlayers.Contains(player))
+                return;
             ServerPlayers.Remove(player);
             var obj = new PlayerLeaveMessage()
             {
