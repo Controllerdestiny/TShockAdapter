@@ -213,15 +213,6 @@ public class Plugin : TerrariaPlugin
             {
                 player.Disconnect(Config.DisConnentFormat);
             }
-            var obj = new PlayerJoinMessage()
-            {
-                MessageType = PostMessageType.PlayerJoin,
-                Name = player.Name,
-                Group = player.Group.Name,
-                Prefix = player.Group.Prefix,
-                IsLogin = player.IsLoggedIn,
-            };
-            WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         }
     }
 
@@ -247,10 +238,18 @@ public class Plugin : TerrariaPlugin
     private void OnGreet(GreetPlayerEventArgs args)
     {
         var player = TShock.Players[args.Who];
-        if (player != null)
+        if (player != null && player.Active)
         {
             ServerPlayers.Add(player);
-
+            var obj = new PlayerJoinMessage()
+            {
+                MessageType = PostMessageType.PlayerJoin,
+                Name = player.Name,
+                Group = player.Group.Name,
+                Prefix = player.Group.Prefix,
+                IsLogin = player.IsLoggedIn,
+            };
+            WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         }
     }
 }
