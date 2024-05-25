@@ -37,6 +37,7 @@ public class WebSocketReceive
 
         var task = Task.Run(async () =>
         {
+            var count = 1;
             while (true)
             {
                 try
@@ -61,11 +62,12 @@ public class WebSocketReceive
                         OnMessage(buffer.ToArray());
                     }
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine("MorMorBot: 连接被断开..");
-                    Console.WriteLine("MorMorBot: 正在进行重连..");
+                    TShock.Log.ConsoleError($"[MorMorAdapter]({count}) 未连接至MorMor机器人，正在进行连接..");
+
                 }
+                count++;
                 await Task.Delay(5000);
             }
         });

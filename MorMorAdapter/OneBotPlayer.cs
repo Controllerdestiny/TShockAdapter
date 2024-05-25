@@ -21,7 +21,7 @@ public class OneBotPlayer : TSPlayer
 
     public override void SendMessage(string msg, byte red, byte green, byte blue)
     {
-        this.CommandOutput.Add(msg);
+        this.CommandOutput.Add(string.Join("", Terraria.UI.Chat.ChatManager.ParseMessage(msg, Color.White).Select(x => x.Text)));
     }
 
     public override void SendInfoMessage(string msg)

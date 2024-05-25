@@ -34,7 +34,32 @@ public class ActionHandler
         { ActionType.ReStartServer , ReStartServerHandler },
         { ActionType.ServerStatus , ServerStatusHandler },
         { ActionType.ResetPassword , ResetPasswordHandler },
+        { ActionType.ConnectStatus, ConnectStatusHandler }
     };
+
+    private static void ConnectStatusHandler(BaseAction action, MemoryStream stream)
+    {
+        var data = Serializer.Deserialize<SocketConnectStatusArgs>(stream);
+        switch(data.Status)
+        {
+            case SocketConnentType.Success:
+                TShock.Log.ConsoleInfo($"[MorMorAdapter] 与({data.ServerName})服务器验证成功，成功连接到MorMor机器人...");
+                break;
+            case SocketConnentType.VerifyError:
+                TShock.Log.ConsoleError($"[MorMorAdapter] 与({data.ServerName})服务器的通信令牌验证失败...");
+                break;
+            case SocketConnentType.ServerNull:
+                TShock.Log.ConsoleError($"[MorMorAdapter] 无法在MorMor机器人上找到({data.ServerName})服务器...");
+                break;
+            default:
+                TShock.Log.ConsoleError("[MorMorAdapter] 因未知错误无验证通信令牌...");
+                break;
+        }
+        ResponseAction(new BaseActionResponse()
+        { 
+            Status = true
+        });
+    }
 
     private static void ResetPasswordHandler(BaseAction action, MemoryStream stream)
     {

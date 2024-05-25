@@ -112,7 +112,6 @@ public class Plugin : TerrariaPlugin
     {
         var obj = new BaseMessage() { MessageType = PostMessageType.Connect };
         WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
-        Console.WriteLine("成功连接到MorMor机器人....");
     }
 
     private void SocketClient_OnMessage(byte[] buffer)
@@ -121,7 +120,7 @@ public class Plugin : TerrariaPlugin
         {
             using MemoryStream ms = new(buffer);
             var baseMsg = Serializer.Deserialize<BaseAction>(ms);
-            if (baseMsg != null && baseMsg.Token == Config.SocketConfig.Token)
+            if (baseMsg.Token == Config.SocketConfig.Token || baseMsg.ActionType == ActionType.ConnectStatus)
             {
                 switch (baseMsg.MessageType)
                 {
@@ -133,7 +132,7 @@ public class Plugin : TerrariaPlugin
         }
         catch (Exception ex)
         {
-            TShock.Log.ConsoleError($"[SocketClient] 接受到无法解析的字符串 {ex}");
+            TShock.Log.ConsoleError($"[MorMorAdapter] 接受到无法解析的字符串， 错误信息: {ex.Message}");
         }
     }
 
