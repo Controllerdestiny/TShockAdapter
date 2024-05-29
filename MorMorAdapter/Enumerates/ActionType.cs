@@ -81,5 +81,10 @@ public enum ActionType
     /// <summary>
     /// 连接状态
     /// </summary>
-    ConnectStatus
+    ConnectStatus,
+
+    /// <summary>
+    /// 获取玩家账号信息
+    /// </summary>
+    Account
 }

@@ -34,8 +34,62 @@ public class ActionHandler
         { ActionType.ReStartServer , ReStartServerHandler },
         { ActionType.ServerStatus , ServerStatusHandler },
         { ActionType.ResetPassword , ResetPasswordHandler },
-        { ActionType.ConnectStatus, ConnectStatusHandler }
+        { ActionType.ConnectStatus, ConnectStatusHandler },
+        { ActionType.Account, AccountHandler },
     };
+
+    private static void AccountHandler(BaseAction action, MemoryStream stream)
+    {
+        var data = Serializer.Deserialize<QueryAccountArgs>(stream);
+        var res = new QueryAccount()
+        {
+            Status = true,
+            Echo = data.Echo,
+            Message = "查询成功"
+        };
+        if (string.IsNullOrEmpty(data.Target))
+        {
+            TShock.UserAccounts.GetUserAccounts().ForEach(account =>
+            {
+                res.Accounts.Add(new Account()
+                {
+                    Group = account.Group,
+                    Name = account.Name,
+                    IP = account.KnownIps,
+                    UUID = account.UUID,
+                    ID = account.ID,
+                    Password = account.Password,
+                    RegisterTime = account.Registered,
+                    LastLoginTime = account.LastAccessed
+                });
+            });
+        }
+        else
+        { 
+            var target = TShock.UserAccounts.GetUserAccountByName(data.Target);
+            if (target != null)
+            {
+                res.Accounts.Add(new Account()
+                {
+                    Group = target.Group,
+                    Name = target.Name,
+                    IP = target.KnownIps,
+                    UUID = target.UUID,
+                    ID = target.ID,
+                    Password = target.Password,
+                    RegisterTime = target.Registered,
+                    LastLoginTime = target.LastAccessed
+                });
+            }
+            else
+            {
+                res.Message = "目标用户不存在!";
+                res.Status = false;
+            }
+
+        }
+        ResponseAction(res);
+    }
 
     private static void ConnectStatusHandler(BaseAction action, MemoryStream stream)
     {
