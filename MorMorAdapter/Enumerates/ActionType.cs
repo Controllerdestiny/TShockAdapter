@@ -86,5 +86,10 @@ public enum ActionType
     /// <summary>
     /// 获取玩家账号信息
     /// </summary>
-    Account
+    Account,
+
+    /// <summary>
+    /// 玩家伤害BOSS记录
+    /// </summary>
+    PlayerStrikeBoss
 }

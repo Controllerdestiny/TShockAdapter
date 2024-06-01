@@ -14,6 +14,7 @@ namespace MorMorAdapter.Model.Action.Response;
 [ProtoInclude(408, typeof(UpLoadWorldFile))]
 [ProtoInclude(409, typeof(ServerStatus))]
 [ProtoInclude(410, typeof(QueryAccount))]
+[ProtoInclude(411, typeof(PlayerStrikeBoss))]
 public class BaseActionResponse : BaseAction
 {
     [ProtoMember(6)] public string Message { get; set; }

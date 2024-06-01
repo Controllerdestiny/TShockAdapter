@@ -36,7 +36,21 @@ public class ActionHandler
         { ActionType.ResetPassword , ResetPasswordHandler },
         { ActionType.ConnectStatus, ConnectStatusHandler },
         { ActionType.Account, AccountHandler },
+        { ActionType.PlayerStrikeBoss, StrikeBossHandler },
     };
+
+    private static void StrikeBossHandler(BaseAction action, MemoryStream stream)
+    {
+        var res = new PlayerStrikeBoss()
+        {
+            Echo = action.Echo,
+            Status = true,
+            Message = "查询成功",
+            Damages = Plugin.DamageBoss.Values.ToList(),
+        };
+
+        ResponseAction(res);
+    }
 
     private static void AccountHandler(BaseAction action, MemoryStream stream)
     {

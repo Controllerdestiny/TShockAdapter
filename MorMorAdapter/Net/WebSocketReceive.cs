@@ -43,7 +43,7 @@ public class WebSocketReceive
                 try
                 {
                     ClientWebSocket = new();
-                    await ClientWebSocket.ConnectAsync(new Uri($"ws://{Host}:{Port}/momo"), default);
+                    ClientWebSocket.ConnectAsync(new Uri($"ws://{Host}:{Port}/momo"), CancellationToken.None).Wait();
                     OnConnect.Invoke();
                     while (true)
                     {
@@ -61,6 +61,7 @@ public class WebSocketReceive
                         buffer = new ArraySegment<byte>(temp);
                         OnMessage(buffer.ToArray());
                     }
+                    
                 }
                 catch
                 {
@@ -71,7 +72,6 @@ public class WebSocketReceive
                 await Task.Delay(5000);
             }
         });
-
     }
 
 

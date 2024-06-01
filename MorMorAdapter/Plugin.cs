@@ -2,6 +2,7 @@
 using MorMorAdapter.Enumerates;
 using MorMorAdapter.Model;
 using MorMorAdapter.Model.Action;
+using MorMorAdapter.Model.Internet;
 using MorMorAdapter.Model.PlayerMessage;
 using MorMorAdapter.Model.ServerMessage;
 using MorMorAdapter.Net;
@@ -41,6 +42,8 @@ public class Plugin : TerrariaPlugin
 
     internal static Channel<int> Channeler = Channel.CreateBounded<int>(1);
 
+    internal static readonly Dictionary<int, KillNpc> DamageBoss = new();
+
     public Plugin(Main game) : base(game)
     {
         AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
@@ -57,13 +60,15 @@ public class Plugin : TerrariaPlugin
         Utils.MapingRest();
         WebSocketReceive.OnConnect += SkocketConnect;
         WebSocketReceive.OnMessage += SocketClient_OnMessage;
-        WebSocketReceive.Start(Config.SocketConfig.IP, Config.SocketConfig.Port);
         ServerApi.Hooks.GamePostInitialize.Register(this, OnInit);
         ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreet);
         ServerApi.Hooks.ServerLeave.Register(this, OnLeave);
         ServerApi.Hooks.ServerJoin.Register(this, OnJoin);
         ServerApi.Hooks.ServerChat.Register(this, OnChat);
         ServerApi.Hooks.GameUpdate.Register(this, OnUpdate);
+        ServerApi.Hooks.NpcSpawn.Register(this, OnSpawn);
+        ServerApi.Hooks.NpcStrike.Register(this, OnStrike);
+        ServerApi.Hooks.NpcKilled.Register(this, OnKillNpc);
         GetDataHandlers.KillMe.Register(OnKill);
         Config.SocketConfig.EmptyCommand.ForEach(x =>
         {
@@ -93,6 +98,56 @@ public class Plugin : TerrariaPlugin
             };
             WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
         };
+        Task.Run(async () => await WebSocketReceive.Start(Config.SocketConfig.IP, Config.SocketConfig.Port));
+    }
+
+    private void OnKillNpc(NpcKilledEventArgs args)
+    {
+        if (args.npc != null && args.npc.active && args.npc.boss)
+        {
+            if (DamageBoss.TryGetValue(args.npc.netID, out var KillNpc))
+            {
+                KillNpc.IsAlive = false;
+                KillNpc.KillTime = DateTime.Now;
+            }
+        }
+    }
+
+    private void OnStrike(NpcStrikeEventArgs args)
+    {
+        if (args.Npc != null && args.Npc.active && args.Npc.boss)
+        {
+            if (DamageBoss.TryGetValue(args.Npc.netID, out var KillNpc) && KillNpc != null)
+            {
+                var damage = KillNpc.Strikes.Find(x => x.Player == args.Player.name);
+                if (damage != null)
+                {
+                    damage.Damage += args.Damage;
+                }
+                else
+                {
+                    KillNpc.Strikes.Add(new()
+                    {
+                        Player = args.Player.name,
+                        Damage = args.Damage
+                    });
+                }
+            }
+        }
+    }
+
+    private void OnSpawn(NpcSpawnEventArgs args)
+    {
+        var npc = Main.npc[args.NpcId];
+        if (npc != null && npc.active && npc.boss)
+        {
+            DamageBoss[npc.netID] = new()
+            { 
+                Id = npc.netID,
+                Name = npc.FullName,
+                MaxLife = npc.lifeMax
+            };
+        }
     }
 
     private Assembly? CurrentDomain_AssemblyResolve(object? sender, ResolveEventArgs args)
@@ -110,8 +165,12 @@ public class Plugin : TerrariaPlugin
 
     private void SkocketConnect()
     {
-        var obj = new BaseMessage() { MessageType = PostMessageType.Connect };
-        WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
+        var obj = new BaseMessage()
+        {
+            MessageType = PostMessageType.Connect,
+        };
+        var stream = Utils.SerializeObj(obj);
+        WebSocketReceive.SendMessage(stream);
     }
 
     private void SocketClient_OnMessage(byte[] buffer)
