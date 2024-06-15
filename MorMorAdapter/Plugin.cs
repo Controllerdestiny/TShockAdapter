@@ -242,6 +242,7 @@ public class Plugin : TerrariaPlugin
                     IsLogin = player.IsLoggedIn,
                     Command = args.Text,
                     CommandPrefix = prefix,
+                    Mute = player.mute
                 };
                 WebSocketReceive.SendMessage(Utils.SerializeObj(obj));
             }
@@ -254,7 +255,8 @@ public class Plugin : TerrariaPlugin
                     Group = player.Group.Name,
                     Prefix = player.Group.Prefix,
                     IsLogin = player.IsLoggedIn,
-                    Text = args.Text
+                    Text = args.Text,
+                    Mute = player.mute
                 };
                 var stream = Utils.SerializeObj(obj);
                 WebSocketReceive.SendMessage(stream);

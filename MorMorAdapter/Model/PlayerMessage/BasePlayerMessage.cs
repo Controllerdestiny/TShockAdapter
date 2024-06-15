@@ -17,4 +17,6 @@ public class BasePlayerMessage : BaseMessage
 
     [ProtoMember(7)] public bool IsLogin { get; set; }
 
+    [ProtoMember(8)] public bool Mute { get; set; }
+
 }
