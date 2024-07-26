@@ -29,13 +29,13 @@ internal enum ProgressType
     [ProgressMatch("血肉墙", typeof(Main), nameof(Main.hardMode))]
     WallOfFlesh,
 
-    [ProgressMatch("双子魔眼", typeof(NPC), nameof(NPC.downedMechBoss1))]
+    [ProgressMatch("双子魔眼", typeof(NPC), nameof(NPC.downedMechBoss2))]
     TheTwins,
 
-    [ProgressMatch("毁灭者", typeof(NPC), nameof(NPC.downedMechBoss3))]
+    [ProgressMatch("毁灭者", typeof(NPC), nameof(NPC.downedMechBoss1))]
     TheDestroyer,
 
-    [ProgressMatch("机械骷髅王", typeof(NPC), nameof(NPC.downedMechBoss2))]
+    [ProgressMatch("机械骷髅王", typeof(NPC), nameof(NPC.downedMechBoss3))]
     SkeletronPrime,
 
     [ProgressMatch("世纪之花", typeof(NPC), nameof(NPC.downedPlantBoss))]
