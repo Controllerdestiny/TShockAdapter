@@ -44,7 +44,7 @@ internal class Rest
             }
             playerName = offline.Name;
             var data = TShock.CharacterDB.GetPlayerData(new TSPlayer(-1), offline.ID);
-            tsplayer = Utils.ModifyData(playerName, data);
+            tsplayer = Utils.CreateAPlayer(playerName, data);
         }
         var retObject = new Model.Internet.PlayerData
         {
@@ -142,22 +142,6 @@ internal class Rest
         };
     }
     #endregion
-
-    //#region 重置
-    //[RestMatch("/reset")]
-    //public object Reset(RestRequestArgs args)
-    //{
-    //    try
-    //    {
-    //        Utils.RestServer();
-    //        return new RestObject("200") { Response = "执行成功!" };
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        return new RestObject("404") { Response = ex.Message };
-    //    }
-    //}
-    //#endregion
 
     #region 获取图片Base64
     [RestMatch("/generatemap")]

@@ -37,7 +37,50 @@ public class ActionHandler
         { ActionType.ConnectStatus, ConnectStatusHandler },
         { ActionType.Account, AccountHandler },
         { ActionType.PlayerStrikeBoss, StrikeBossHandler },
+        { ActionType.ExportPlayer, ExportPlayerHandler }
     };
+
+    private static void ExportPlayerHandler(BaseAction action, MemoryStream stream)
+    {
+        var data = Serializer.Deserialize<ExportPlayerArgs>(stream);
+        if (data.Names == null || !data.Names.Any())
+            data.Names = TShock.UserAccounts.GetUserAccounts().Select(x => x.Name).ToList();
+        var res = new ExportPlayer()
+        {
+            Status = true,
+            Echo = data.Echo,
+            Message = "导出成功"
+        };
+        var playerfiles = new List<PlayerFile>();
+        foreach (var name in data.Names)
+        {
+            var playerfile = new PlayerFile()
+            {
+                Name = name
+            };
+            var account = TShock.UserAccounts.GetUserAccountByName(name);
+            if (account == null)
+            {
+                playerfile.Active = false;
+            }
+            else
+            {
+                var playerData = TShock.CharacterDB.GetPlayerData(new TSPlayer(-1), account.ID);
+                var player = Utils.CreateAPlayer(name, playerData);
+                try
+                {
+                    playerfile.Buffer = Utils.ExportPlayer(player);
+                }
+                catch
+                {
+                    continue;
+                }
+            }
+            playerfiles.Add(playerfile);
+        }
+        res.PlayerFiles = playerfiles;
+        ResponseAction(res);
+    }
 
     private static void StrikeBossHandler(BaseAction action, MemoryStream stream)
     {

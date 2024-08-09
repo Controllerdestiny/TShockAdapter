@@ -191,7 +191,7 @@ public class Plugin : TerrariaPlugin
         }
         catch (Exception ex)
         {
-            TShock.Log.ConsoleError($"[MorMorAdapter] 接受到无法解析的字符串， 错误信息: {ex.Message}");
+            TShock.Log.ConsoleError($"[MorMorAdapter] 解析通信时出错: {ex}");
         }
     }
 

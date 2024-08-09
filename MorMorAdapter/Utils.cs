@@ -4,7 +4,6 @@ using MorMorAdapter.Extension;
 using MorMorAdapter.Model.Action.Receive;
 using MorMorAdapter.Model.Internet;
 using ProtoBuf;
-using ProtoBuf.Meta;
 using Rests;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Jpeg;
@@ -12,6 +11,7 @@ using SixLabors.ImageSharp.Formats.Png;
 using SixLabors.ImageSharp.PixelFormats;
 using System.Diagnostics;
 using System.Reflection;
+using System.Security.Cryptography;
 using Terraria;
 using Terraria.GameContent.Creative;
 using Terraria.IO;
@@ -24,14 +24,26 @@ namespace MorMorAdapter;
 
 internal class Utils
 {
-
-
-    public static T ReadProtobufItem<T>(MemoryStream stream)
+    public static byte[] ExportPlayer(Player player, long time = 0L)
     {
-        stream.Seek(0, SeekOrigin.Begin);
-        var mode = RuntimeTypeModel.Create();
-        mode.Add(typeof(T), true);
-        return mode.Deserialize<T>(stream);
+        var playerFileData = new PlayerFileData
+        {
+            Metadata = FileMetadata.FromCurrentSettings(FileType.Player),
+            Player = player,
+            _isCloudSave = false
+        };
+        playerFileData.SetPlayTime(new TimeSpan(time * 10000000L));
+        Main.LocalFavoriteData.ClearEntry(playerFileData);
+        using var stream = new MemoryStream();
+        using var cryptoStream = new CryptoStream(stream, Aes.Create().CreateEncryptor(Player.ENCRYPTION_KEY, Player.ENCRYPTION_KEY), CryptoStreamMode.Write);
+        using var binaryWriter = new BinaryWriter(cryptoStream);
+        binaryWriter.Write(279);
+        playerFileData.Metadata.Write(binaryWriter);
+        Player.Serialize(playerFileData, player, binaryWriter);
+        binaryWriter.Flush();
+        cryptoStream.FlushFinalBlock();
+        //stream.Flush();
+        return stream.ToArray();
     }
 
     public static MemoryStream SerializeObj<T>(T obj)
@@ -215,7 +227,7 @@ internal class Utils
             }
             playerName = offline.Name;
             var data = TShock.CharacterDB.GetPlayerData(new TSPlayer(-1), offline.ID);
-            tsplayer = Utils.ModifyData(playerName, data);
+            tsplayer = CreateAPlayer(playerName, data);
         }
         var retObject = new Model.Internet.PlayerData
         {
@@ -280,86 +292,403 @@ internal class Utils
         return retObject;
     }
 
-    /// <summary>
-    /// 从数据库加载一个Player
-    /// </summary>
-    /// <param name="name">玩家名</param>
-    /// <param name="data">数据</param>
-    /// <returns></returns>
-    public static Player ModifyData(string name, TShockAPI.PlayerData data)
+
+    public static Player CreateAPlayer(string name, TShockAPI.PlayerData data)
     {
         Player player = new();
-        if (data != null)
+        player.name = name;
+        player.statLife = data.health;
+        player.statLifeMax = data.maxHealth;
+        player.statMana = data.mana;
+        player.statManaMax = data.maxMana;
+        player.extraAccessory = data.extraSlot == 1 ? true : false;
+        player.skinVariant = data.skinVariant ?? default;
+        player.hair = data.hair ?? default;
+        player.hairDye = data.hairDye;
+        player.hairColor = data.hairColor ?? default;
+        player.pantsColor = data.pantsColor ?? default;
+        player.shirtColor = data.shirtColor ?? default;
+        player.underShirtColor = data.underShirtColor ?? default;
+        player.shoeColor = data.shoeColor ?? default;
+        player.hideVisibleAccessory = data.hideVisuals;
+        player.skinColor = data.skinColor ?? default;
+        player.eyeColor = data.eyeColor ?? default;
+        player.anglerQuestsFinished = data.questsCompleted;
+        player.UsingBiomeTorches = (data.usingBiomeTorches == 1);
+        player.happyFunTorchTime = (data.happyFunTorchTime == 1);
+        player.unlockedBiomeTorches = (data.unlockedBiomeTorches == 1);
+        player.ateArtisanBread = (data.ateArtisanBread == 1);
+        player.usedAegisCrystal = (data.usedAegisCrystal == 1);
+        player.usedAegisFruit = (data.usedAegisFruit == 1);
+        player.usedAegisCrystal = (data.usedArcaneCrystal == 1);
+        player.usedGalaxyPearl = (data.usedGalaxyPearl == 1);
+        player.usedGummyWorm = (data.usedGummyWorm == 1);
+        player.usedAmbrosia = (data.usedAmbrosia == 1);
+        player.unlockedSuperCart = (data.unlockedSuperCart == 1);
+        player.enabledSuperCart = (data.enabledSuperCart == 1);
+        //正常同步
+        if (data.currentLoadoutIndex == player.CurrentLoadoutIndex)
         {
-            player.name = name;
-            player.SpawnX = data.spawnX;
-            player.SpawnY = data.spawnY;
-
-            player.hideVisibleAccessory = data.hideVisuals;
-            player.skinVariant = data.skinVariant ?? default;
-            player.statLife = data.health;
-            player.statLifeMax = data.maxHealth;
-            player.statMana = data.mana;
-            player.statManaMax = data.maxMana;
-            player.extraAccessory = data.extraSlot == 1;
-
-            player.difficulty = (byte)Main.GameModeInfo.Id;
-
-            // 火把神
-            player.unlockedBiomeTorches = data.unlockedBiomeTorches == 1;
-
-            player.hairColor = data.hairColor ?? default;
-            player.skinColor = data.skinColor ?? default;
-            player.eyeColor = data.eyeColor ?? default;
-            player.shirtColor = data.shirtColor ?? default;
-            player.underShirtColor = data.underShirtColor ?? default;
-            player.pantsColor = data.pantsColor ?? default;
-            player.shoeColor = data.shoeColor ?? default;
-            player.hair = data.hair ?? default;
-            player.hairDye = data.hairDye;
-            player.anglerQuestsFinished = data.questsCompleted;
-            player.CurrentLoadoutIndex = data.currentLoadoutIndex;
-
             for (int i = 0; i < NetItem.MaxInventory; i++)
             {
-                //  0~49 背包   5*10
-                //  50、51、52、53 钱
-                //  54、55、56、57 弹药
-                // 59 ~68  饰品栏
-                // 69 ~78  社交栏
-                // 79 ~88  染料1
-                // 89 ~93  宠物、照明、矿车、坐骑、钩爪
-                // 94 ~98  染料2
-                // 99~138 储蓄罐
-                // 139~178 保险箱（商人）
-                // 179 垃圾桶
-                // 180~219 护卫熔炉
-                // 220~259 虚空保险箱
-                // 260~350 装备123
-                if (i < 59) player.inventory[i] = NetItem2Item(data.inventory[i]);
-                else if (i >= 59 && i < 79) player.armor[i - 59] = NetItem2Item(data.inventory[i]);
-                else if (i >= 79 && i < 89) player.dye[i - 79] = NetItem2Item(data.inventory[i]);
-                else if (i >= 89 && i < 94) player.miscEquips[i - 89] = NetItem2Item(data.inventory[i]);
-                else if (i >= 94 && i < 99) player.miscDyes[i - 94] = NetItem2Item(data.inventory[i]);
-                else if (i >= 99 && i < 139) player.bank.item[i - 99] = NetItem2Item(data.inventory[i]);
-                else if (i >= 139 && i < 179) player.bank2.item[i - 139] = NetItem2Item(data.inventory[i]);
-                else if (i == 179) player.trashItem = NetItem2Item(data.inventory[i]);
-                else if (i >= 180 && i < 220) player.bank3.item[i - 180] = NetItem2Item(data.inventory[i]);
-                else if (i >= 220 && i < 260) player.bank4.item[i - 220] = NetItem2Item(data.inventory[i]);
+                if (i < NetItem.InventoryIndex.Item2)
+                {
+                    player.inventory[i] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.inventory[i].stack = data.inventory[i].Stack;
+                    player.inventory[i].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.ArmorIndex.Item2)
+                {
+                    int num = i - NetItem.ArmorIndex.Item1;
+                    player.armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.armor[num].stack = data.inventory[i].Stack;
+                    player.armor[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.DyeIndex.Item2)
+                {
+                    int num2 = i - NetItem.DyeIndex.Item1;
+                    player.dye[num2] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.dye[num2].stack = data.inventory[i].Stack;
+                    player.dye[num2].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.MiscEquipIndex.Item2)
+                {
+                    int num3 = i - NetItem.MiscEquipIndex.Item1;
+                    player.miscEquips[num3] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.miscEquips[num3].stack = data.inventory[i].Stack;
+                    player.miscEquips[num3].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.MiscDyeIndex.Item2)
+                {
+                    int num4 = i - NetItem.MiscDyeIndex.Item1;
+                    player.miscDyes[num4] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.miscDyes[num4].stack = data.inventory[i].Stack;
+                    player.miscDyes[num4].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.PiggyIndex.Item2)
+                {
+                    int num5 = i - NetItem.PiggyIndex.Item1;
+                    player.bank.item[num5] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank.item[num5].stack = data.inventory[i].Stack;
+                    player.bank.item[num5].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.SafeIndex.Item2)
+                {
+                    int num6 = i - NetItem.SafeIndex.Item1;
+                    player.bank2.item[num6] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank2.item[num6].stack = data.inventory[i].Stack;
+                    player.bank2.item[num6].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.TrashIndex.Item2)
+                {
+                    player.trashItem = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.trashItem.stack = data.inventory[i].Stack;
+                    player.trashItem.prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.ForgeIndex.Item2)
+                {
+                    int num7 = i - NetItem.ForgeIndex.Item1;
+                    player.bank3.item[num7] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank3.item[num7].stack = data.inventory[i].Stack;
+                    player.bank3.item[num7].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.VoidIndex.Item2)
+                {
+                    int num8 = i - NetItem.VoidIndex.Item1;
+                    player.bank4.item[num8] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank4.item[num8].stack = data.inventory[i].Stack;
+                    player.bank4.item[num8].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout1Armor.Item2)
+                {
+                    int num9 = i - NetItem.Loadout1Armor.Item1;
+                    player.Loadouts[0].Armor[num9] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[0].Armor[num9].stack = data.inventory[i].Stack;
+                    player.Loadouts[0].Armor[num9].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout1Dye.Item2)
+                {
+                    int num10 = i - NetItem.Loadout1Dye.Item1;
+                    player.Loadouts[0].Dye[num10] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[0].Dye[num10].stack = data.inventory[i].Stack;
+                    player.Loadouts[0].Dye[num10].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout2Armor.Item2)
+                {
+                    int num11 = i - NetItem.Loadout2Armor.Item1;
+                    player.Loadouts[1].Armor[num11] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[1].Armor[num11].stack = data.inventory[i].Stack;
+                    player.Loadouts[1].Armor[num11].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout2Dye.Item2)
+                {
+                    int num12 = i - NetItem.Loadout2Dye.Item1;
+                    player.Loadouts[1].Dye[num12] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[1].Dye[num12].stack = data.inventory[i].Stack;
+                    player.Loadouts[1].Dye[num12].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout3Armor.Item2)
+                {
+                    int num13 = i - NetItem.Loadout3Armor.Item1;
+                    player.Loadouts[2].Armor[num13] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[2].Armor[num13].stack = data.inventory[i].Stack;
+                    player.Loadouts[2].Armor[num13].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout3Dye.Item2)
+                {
+                    int num14 = i - NetItem.Loadout3Dye.Item1;
+                    player.Loadouts[2].Dye[num14] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[2].Dye[num14].stack = data.inventory[i].Stack;
+                    player.Loadouts[2].Dye[num14].prefix = data.inventory[i].PrefixId;
+                }
+            }
+        }
+        //异常同步
+        else
+        {
+            int notselected = 0;
+            for (int i = 0; i < 3; i++)
+            {
+                if (player.CurrentLoadoutIndex != i && data.currentLoadoutIndex != i)
+                {
+                    notselected = i;
+                }
+            }
+            for (int i = 0; i < NetItem.MaxInventory; i++)
+            {
+                if (i < NetItem.InventoryIndex.Item2)
+                {
+                    player.inventory[i] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.inventory[i].stack = data.inventory[i].Stack;
+                    player.inventory[i].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.ArmorIndex.Item2)
+                {
+                    int num = i - NetItem.ArmorIndex.Item1;
+                    player.Loadouts[data.currentLoadoutIndex].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[data.currentLoadoutIndex].Armor[num].stack = data.inventory[i].Stack;
+                    player.Loadouts[data.currentLoadoutIndex].Armor[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.DyeIndex.Item2)
+                {
+                    int num = i - NetItem.DyeIndex.Item1;
+                    player.Loadouts[data.currentLoadoutIndex].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.Loadouts[data.currentLoadoutIndex].Dye[num].stack = data.inventory[i].Stack;
+                    player.Loadouts[data.currentLoadoutIndex].Dye[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.MiscEquipIndex.Item2)
+                {
+                    int num = i - NetItem.MiscEquipIndex.Item1;
+                    player.miscEquips[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.miscEquips[num].stack = data.inventory[i].Stack;
+                    player.miscEquips[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.MiscDyeIndex.Item2)
+                {
+                    int num = i - NetItem.MiscDyeIndex.Item1;
+                    player.miscDyes[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.miscDyes[num].stack = data.inventory[i].Stack;
+                    player.miscDyes[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.PiggyIndex.Item2)
+                {
+                    int num = i - NetItem.PiggyIndex.Item1;
+                    player.bank.item[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank.item[num].stack = data.inventory[i].Stack;
+                    player.bank.item[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.SafeIndex.Item2)
+                {
+                    int num = i - NetItem.SafeIndex.Item1;
+                    player.bank2.item[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank2.item[num].stack = data.inventory[i].Stack;
+                    player.bank2.item[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.TrashIndex.Item2)
+                {
+                    player.trashItem = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.trashItem.stack = data.inventory[i].Stack;
+                    player.trashItem.prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.ForgeIndex.Item2)
+                {
+                    int num = i - NetItem.ForgeIndex.Item1;
+                    player.bank3.item[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank3.item[num].stack = data.inventory[i].Stack;
+                    player.bank3.item[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.VoidIndex.Item2)
+                {
+                    int num = i - NetItem.VoidIndex.Item1;
+                    player.bank4.item[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                    player.bank4.item[num].stack = data.inventory[i].Stack;
+                    player.bank4.item[num].prefix = data.inventory[i].PrefixId;
+                }
+                else if (i < NetItem.Loadout1Armor.Item2)
+                {
+                    int num = i - NetItem.Loadout1Armor.Item1;
+                    if (data.currentLoadoutIndex != 0)
+                    {
+                        if (notselected == 0)
+                        {
+                            player.Loadouts[0].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[0].Armor[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[0].Armor[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else if (player.CurrentLoadoutIndex != 0)
+                        {
+                            player.Loadouts[0].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[0].Armor[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[0].Armor[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else
+                        {
+                            player.Loadouts[0].Armor[num].TurnToAir(false);
+                            player.armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.armor[num].stack = data.inventory[i].Stack;
+                            player.armor[num].prefix = data.inventory[i].PrefixId;
+                        }
 
-                else if (i >= 260 && i < 280) player.Loadouts[0].Armor[i - 260] = NetItem2Item(data.inventory[i]);
-                else if (i >= 280 && i < 290) player.Loadouts[0].Dye[i - 280] = NetItem2Item(data.inventory[i]);
-
-                else if (i >= 290 && i < 310) player.Loadouts[1].Armor[i - 290] = NetItem2Item(data.inventory[i]);
-                else if (i >= 310 && i < 320) player.Loadouts[1].Dye[i - 310] = NetItem2Item(data.inventory[i]);
-
-                else if (i >= 320 && i < 340) player.Loadouts[2].Armor[i - 320] = NetItem2Item(data.inventory[i]);
-                else if (i >= 340 && i < 350) player.Loadouts[2].Dye[i - 340] = NetItem2Item(data.inventory[i]);
+                    }
+                }
+                else if (i < NetItem.Loadout1Dye.Item2)
+                {
+                    int num = i - NetItem.Loadout1Dye.Item1;
+                    if (data.currentLoadoutIndex != 0)
+                    {
+                        if (notselected == 0)
+                        {
+                            player.Loadouts[0].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[0].Dye[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[0].Dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else if (player.CurrentLoadoutIndex != 0)
+                        {
+                            player.Loadouts[0].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[0].Dye[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[0].Dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else
+                        {
+                            player.Loadouts[0].Dye[num].TurnToAir(false);
+                            player.dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.dye[num].stack = data.inventory[i].Stack;
+                            player.dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                    }
+                }
+                else if (i < NetItem.Loadout2Armor.Item2)
+                {
+                    int num = i - NetItem.Loadout2Armor.Item1;
+                    if (data.currentLoadoutIndex != 1)
+                    {
+                        if (notselected == 1)
+                        {
+                            player.Loadouts[1].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[1].Armor[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[1].Armor[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else if (player.CurrentLoadoutIndex != 1)
+                        {
+                            player.Loadouts[1].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[1].Armor[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[1].Armor[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else
+                        {
+                            player.Loadouts[1].Armor[num].TurnToAir(false);
+                            player.armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.armor[num].stack = data.inventory[i].Stack;
+                            player.armor[num].prefix = data.inventory[i].PrefixId;
+                        }
+                    }
+                }
+                else if (i < NetItem.Loadout2Dye.Item2)
+                {
+                    int num = i - NetItem.Loadout2Dye.Item1;
+                    if (data.currentLoadoutIndex != 1)
+                    {
+                        if (notselected == 1)
+                        {
+                            player.Loadouts[1].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[1].Dye[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[1].Dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else if (player.CurrentLoadoutIndex != 1)
+                        {
+                            player.Loadouts[1].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[1].Dye[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[1].Dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else
+                        {
+                            player.Loadouts[1].Dye[num].TurnToAir(false);
+                            player.dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.dye[num].stack = data.inventory[i].Stack;
+                            player.dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                    }
+                }
+                else if (i < NetItem.Loadout3Armor.Item2)
+                {
+                    int num = i - NetItem.Loadout3Armor.Item1;
+                    if (data.currentLoadoutIndex != 2)
+                    {
+                        if (notselected == 2)
+                        {
+                            player.Loadouts[2].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[2].Armor[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[2].Armor[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else
+                        {
+                            if (player.CurrentLoadoutIndex != 2)
+                            {
+                                player.Loadouts[2].Armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                                player.Loadouts[2].Armor[num].stack = data.inventory[i].Stack;
+                                player.Loadouts[2].Armor[num].prefix = data.inventory[i].PrefixId;
+                            }
+                            else
+                            {
+                                player.Loadouts[2].Armor[num].TurnToAir(false);
+                                player.armor[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                                player.armor[num].stack = data.inventory[i].Stack;
+                                player.armor[num].prefix = data.inventory[i].PrefixId;
+                            }
+                        }
+                    }
+                }
+                else if (i < NetItem.Loadout3Dye.Item2)
+                {
+                    int num = i - NetItem.Loadout3Dye.Item1;
+                    if (data.currentLoadoutIndex != 2)
+                    {
+                        if (notselected == 2)
+                        {
+                            player.Loadouts[2].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[2].Dye[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[2].Dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else if (player.CurrentLoadoutIndex != 2)
+                        {
+                            player.Loadouts[2].Dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.Loadouts[2].Dye[num].stack = data.inventory[i].Stack;
+                            player.Loadouts[2].Dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                        else
+                        {
+                            player.Loadouts[2].Dye[num].TurnToAir(false);
+                            player.dye[num] = TShock.Utils.GetItemById(data.inventory[i].NetId);
+                            player.dye[num].stack = data.inventory[i].Stack;
+                            player.dye[num].prefix = data.inventory[i].PrefixId;
+                        }
+                    }
+                }
             }
         }
         return player;
     }
-
+   
     public static Terraria.Item NetItem2Item(NetItem netItem)
     {
         var item = new Terraria.Item
